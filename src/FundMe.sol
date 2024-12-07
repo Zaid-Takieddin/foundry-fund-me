@@ -2,6 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {PriceConverter} from "./PriceConverter.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract FundMe {
     using PriceConverter for uint256;
@@ -15,15 +16,18 @@ contract FundMe {
 
     address public immutable i_owner;
 
+    AggregatorV3Interface private s_priceFeed;
+
     error FundMe_NotAuthorized();
 
-    constructor() {
+    constructor(address priceFeed) {
+        s_priceFeed = AggregatorV3Interface(priceFeed);
         i_owner = msg.sender;
     }
 
     function fund() public payable {
         require(
-            msg.value.getConversionRate() >= MINIMUM_USD,
+            msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD,
             "didn't send enough ETH"
         );
         funders.push(msg.sender);
@@ -45,6 +49,10 @@ contract FundMe {
             value: address(this).balance
         }("");
         require(callSuccess, "call failed");
+    }
+
+    function getVersion() public view returns (uint256) {
+        return s_priceFeed.version();
     }
 
     modifier onlyOwner() {
